@@ -1,5 +1,6 @@
 import QtQuick
 import QtWebEngine
+import QtQuick.VirtualKeyboard
 
 Window {
     id: window
@@ -9,7 +10,7 @@ Window {
     WebEngineView {
         id: webView
         anchors.fill: parent
-        url: "chrome://qt"
+        url: "https://www.wikipedia.org"
 
         settings.playbackRequiresUserGesture: false
 
@@ -32,6 +33,35 @@ Window {
 
             console.error(`Console: Render process exited with code ${exitCode} (${status})`);
             reload();
+        }
+    }
+
+    InputPanel {
+        id: inputPanel
+        z: 99
+        x: 0
+        y: window.height
+        width: window.width
+
+        states: State {
+            name: "visible"
+            when: inputPanel.active
+            PropertyChanges {
+                target: inputPanel
+                y: window.height - inputPanel.height
+            }
+        }
+        transitions: Transition {
+            from: ""
+            to: "visible"
+            reversible: true
+            ParallelAnimation {
+                NumberAnimation {
+                    properties: "y"
+                    duration: 250
+                    easing.type: Easing.InOutQuad
+                }
+            }
         }
     }
 }

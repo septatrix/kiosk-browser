@@ -4,6 +4,8 @@
 
 int main(int argc, char *argv[])
 {
+    qputenv("QT_IM_MODULE", QByteArray("qtvirtualkeyboard"));
+
     QtWebEngineQuick::initialize();
     QGuiApplication app(argc, argv);
 
