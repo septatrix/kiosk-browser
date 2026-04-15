@@ -57,12 +57,13 @@ jobs:
           DESTDIR="${PWD}/stage" cmake --install build
           cpack --config build/CPackConfig.cmake -G DEB -B build/packages
 
-          APP_BINARY="stage/usr/bin/appkiosk-browser"
-          if [ ! -x "${APP_BINARY}" ]; then
-            APP_BINARY="stage/usr/bin/kiosk-browser"
+          mapfile -t MATCHED_BINARIES < <(find stage/usr/bin -maxdepth 1 -type f -name '*kiosk-browser*' -executable)
+          if [ "${#MATCHED_BINARIES[@]}" -ne 1 ]; then
+            echo "Error: expected exactly one kiosk-browser executable in stage/usr/bin, found ${#MATCHED_BINARIES[@]}"
+            printf '%s\n' "${MATCHED_BINARIES[@]}"
+            exit 1
           fi
-          test -x "${APP_BINARY}" || { echo "Error: No kiosk-browser executable found in stage/usr/bin"; exit 1; }
-          cp "${APP_BINARY}" "build/kiosk-browser-${{ matrix.rpios_release }}-arm64"
+          cp "${MATCHED_BINARIES[0]}" "build/kiosk-browser-${{ matrix.rpios_release }}-arm64"
 
       - name: Upload raw binary
         uses: actions/upload-artifact@v4
