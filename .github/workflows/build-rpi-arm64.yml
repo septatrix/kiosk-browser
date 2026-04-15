@@ -6,7 +6,7 @@ on:
     types: [published]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -57,7 +57,9 @@ jobs:
           DESTDIR="${PWD}/stage" cmake --install build
           cpack --config build/CPackConfig.cmake -G DEB -B build/packages
 
-          cp stage/usr/bin/appkiosk-browser "build/kiosk-browser-${{ matrix.rpios_release }}-arm64"
+          APP_BINARY="$(find stage/usr/bin -maxdepth 1 -type f -executable | head -n 1)"
+          test -n "${APP_BINARY}"
+          cp "${APP_BINARY}" "build/kiosk-browser-${{ matrix.rpios_release }}-arm64"
 
       - name: Upload raw binary
         uses: actions/upload-artifact@v4
