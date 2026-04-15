@@ -57,7 +57,7 @@ jobs:
           DESTDIR="${PWD}/stage" cmake --install build
           cpack --config build/CPackConfig.cmake -G DEB -B build/packages
 
-          APP_BINARY="$(find stage/usr/bin -maxdepth 1 -type f -executable | head -n 1)"
+          APP_BINARY="$(find stage/usr/bin -maxdepth 1 -type f -name '*kiosk-browser*' -executable | head -n 1)"
           test -n "${APP_BINARY}" || { echo "Error: No executable binary found in stage/usr/bin"; exit 1; }
           cp "${APP_BINARY}" "build/kiosk-browser-${{ matrix.rpios_release }}-arm64"
 
