@@ -60,6 +60,7 @@ jobs:
           # Keep ordering aligned with Fedora; dpkg-dev/fakeroot are Debian-specific packaging tools.
           apt-get install -y --no-install-recommends \
             bash \
+            ca-certificates \
             cmake \
             ninja-build \
             file \
@@ -79,6 +80,7 @@ jobs:
           # rpm-build mirrors Debian's packaging tools; findutils provides GNU find in minimal Fedora images.
           dnf -y --refresh --setopt=install_weak_deps=False install \
             bash \
+            ca-certificates \
             cmake \
             ninja-build \
             file \
