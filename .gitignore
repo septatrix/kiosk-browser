@@ -80,6 +80,8 @@ Makefile*
 *.qm
 *.prl
 
+!/.github/workflows/build-*.yml
+
 # Qt unit tests
 target_wrapper.*
 
