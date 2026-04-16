@@ -1,6 +1,9 @@
 name: Build Raspberry Pi OS arm64 binaries
 
 on:
+  pull_request:
+  push:
+    branches: [master]
   workflow_dispatch:
   release:
     types: [published]
@@ -10,35 +13,87 @@ permissions:
 
 jobs:
   build:
-    name: Build for ${{ matrix.rpios_release }} (arm64)
-    runs-on: ubuntu-24.04-arm
+    name: Build for ${{ matrix.artifact_label }} (${{ matrix.arch_label }})
+    runs-on: ${{ matrix.runs_on }}
     strategy:
       fail-fast: false
       matrix:
-        rpios_release: [bookworm, trixie]
+        include:
+          - artifact_label: bookworm
+            arch_label: arm64
+            distro: debian
+            runs_on: ubuntu-24.04-arm
+            container_image: debian:bookworm
+            package_generator: DEB
+            package_extension: deb
+          - artifact_label: trixie
+            arch_label: arm64
+            distro: debian
+            runs_on: ubuntu-24.04-arm
+            container_image: debian:trixie
+            package_generator: DEB
+            package_extension: deb
+          - artifact_label: fedora43
+            arch_label: x86_64
+            distro: fedora
+            runs_on: ubuntu-24.04
+            container_image: fedora:43
+            package_generator: RPM
+            package_extension: rpm
+          - artifact_label: fedora44
+            arch_label: x86_64
+            distro: fedora
+            runs_on: ubuntu-24.04
+            container_image: fedora:44
+            package_generator: RPM
+            package_extension: rpm
     container:
-      image: debian:${{ matrix.rpios_release }}
+      image: ${{ matrix.container_image }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Install build dependencies
+      - name: Install build dependencies (Debian)
+        if: matrix.distro == 'debian'
         run: |
           apt-get update
+          # Keep ordering aligned with Fedora where package names map cleanly.
+          # dpkg-dev/fakeroot are Debian-specific packaging tools.
           apt-get install -y --no-install-recommends \
             bash \
-            build-essential \
             ca-certificates \
             cmake \
+            ninja-build \
+            file \
+            pkg-config \
+            build-essential \
             dpkg-dev \
             fakeroot \
-            file \
-            ninja-build \
-            pkg-config \
             qt6-base-dev \
             qt6-declarative-dev \
             qt6-virtualkeyboard-dev \
             qt6-webengine-dev
+
+      - name: Install build dependencies (Fedora)
+        if: matrix.distro == 'fedora'
+        run: |
+          # Use inline metadata refresh and disable weak deps (equivalent to apt update + --no-install-recommends).
+          # rpm-build mirrors Debian's packaging tools; findutils provides GNU find in minimal Fedora images.
+          dnf -y --refresh --setopt=install_weak_deps=False install \
+            bash \
+            ca-certificates \
+            cmake \
+            ninja-build \
+            file \
+            pkgconf-pkg-config \
+            gcc-c++ \
+            make \
+            rpm-build \
+            findutils \
+            qt6-qtbase-devel \
+            qt6-qtdeclarative-devel \
+            qt6-qtvirtualkeyboard-devel \
+            qt6-qtwebengine-devel
 
       - name: Build and package
         shell: bash
@@ -51,30 +106,31 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCPACK_GENERATOR=DEB \
-            -DCPACK_PACKAGE_VERSION="${VERSION}" \
-            -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=arm64
+            -DCPACK_GENERATOR=${{ matrix.package_generator }} \
+            -DCPACK_PACKAGE_VERSION="${VERSION}"
 
           cmake --build build --parallel
           DESTDIR="${PWD}/stage" cmake --install build
-          cpack --config build/CPackConfig.cmake -G DEB -B build/packages
+          cpack --config build/CPackConfig.cmake -G ${{ matrix.package_generator }} -B build/packages
 
           mapfile -t MATCHED_BINARIES < <(find stage/usr/bin -maxdepth 1 -type f -name '*kiosk-browser*' -executable)
           if [ "${#MATCHED_BINARIES[@]}" -ne 1 ]; then
-            echo "Error: expected exactly one kiosk-browser executable in stage/usr/bin, found ${#MATCHED_BINARIES[@]}"
+            printf '%s\n' "Error: expected exactly one kiosk-browser executable in stage/usr/bin, found ${#MATCHED_BINARIES[@]}"
             printf '%s\n' "${MATCHED_BINARIES[@]}"
             exit 1
           fi
-          cp "${MATCHED_BINARIES[0]}" "build/kiosk-browser-${{ matrix.rpios_release }}-arm64"
+          cp "${MATCHED_BINARIES[0]}" "build/kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}"
 
       - name: Upload raw binary
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: kiosk-browser-${{ matrix.rpios_release }}-arm64-binary
-          path: build/kiosk-browser-${{ matrix.rpios_release }}-arm64
+          name: kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}-binary
+          path: build/kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}
 
-      - name: Upload Debian package
+      - name: Upload package artifact
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: kiosk-browser-${{ matrix.rpios_release }}-arm64-deb
-          path: build/packages/*.deb
+          name: kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}-${{ matrix.package_extension }}
+          path: build/packages/*.${{ matrix.package_extension }}
