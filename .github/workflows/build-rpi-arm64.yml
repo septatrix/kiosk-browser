@@ -57,7 +57,7 @@ jobs:
         if: matrix.distro == 'debian'
         run: |
           apt-get update
-          # Keep ordering aligned with Fedora; dpkg-dev/fakeroot are Debian-specific packaging tools.
+          # Keep ordering aligned with Fedora. dpkg-dev/fakeroot are Debian-specific packaging tools.
           apt-get install -y --no-install-recommends \
             bash \
             ca-certificates \
