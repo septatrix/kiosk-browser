@@ -26,6 +26,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
+            bash \
             build-essential \
             ca-certificates \
             cmake \
@@ -40,6 +41,7 @@ jobs:
             qt6-webengine-dev
 
       - name: Build and package
+        shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "${VERSION}" ] || [ "${VERSION}" = "${GITHUB_REF_NAME}" ]; then
