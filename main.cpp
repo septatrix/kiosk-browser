@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QUrl>
@@ -15,7 +16,7 @@ int main(int argc, char *argv[])
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
         &app,
-        []() { QCoreApplication::exit(-1); },
+        []() { QCoreApplication::exit(EXIT_FAILURE); },
         Qt::QueuedConnection);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     engine.loadFromModule("kiosk-browser", "Main");
@@ -23,7 +24,7 @@ int main(int argc, char *argv[])
     engine.load(QUrl(QStringLiteral("qrc:/qt/qml/kiosk-browser/Main.qml")));
 #endif
     if (engine.rootObjects().isEmpty()) {
-        return -1;
+        return EXIT_FAILURE;
     }
 
     return app.exec();

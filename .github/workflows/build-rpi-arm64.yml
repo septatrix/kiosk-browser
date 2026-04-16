@@ -13,99 +13,84 @@ permissions:
 
 jobs:
   build:
-    name: Build for ${{ matrix.artifact_label }} (arm64)
-    runs-on: ubuntu-24.04-arm
+    name: Build for ${{ matrix.artifact_label }} (${{ matrix.arch_label }})
+    runs-on: ${{ matrix.runs_on }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - artifact_label: bookworm
+            arch_label: arm64
+            distro: debian
+            runs_on: ubuntu-24.04-arm
             container_image: debian:bookworm
             package_generator: DEB
             package_extension: deb
             package_architecture_arg: -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=arm64
-            install_dependencies: |
-              apt-get update
-              apt-get install -y --no-install-recommends \
-                bash \
-                build-essential \
-                ca-certificates \
-                cmake \
-                dpkg-dev \
-                fakeroot \
-                file \
-                ninja-build \
-                pkg-config \
-                qt6-base-dev \
-                qt6-declarative-dev \
-                qt6-virtualkeyboard-dev \
-                qt6-webengine-dev
           - artifact_label: trixie
+            arch_label: arm64
+            distro: debian
+            runs_on: ubuntu-24.04-arm
             container_image: debian:trixie
             package_generator: DEB
             package_extension: deb
             package_architecture_arg: -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=arm64
-            install_dependencies: |
-              apt-get update
-              apt-get install -y --no-install-recommends \
-                bash \
-                build-essential \
-                ca-certificates \
-                cmake \
-                dpkg-dev \
-                fakeroot \
-                file \
-                ninja-build \
-                pkg-config \
-                qt6-base-dev \
-                qt6-declarative-dev \
-                qt6-virtualkeyboard-dev \
-                qt6-webengine-dev
           - artifact_label: fedora43
+            arch_label: x86_64
+            distro: fedora
+            runs_on: ubuntu-24.04
             container_image: fedora:43
             package_generator: RPM
             package_extension: rpm
             package_architecture_arg: ""
-            install_dependencies: |
-              dnf -y install \
-                bash \
-                cmake \
-                findutils \
-                gcc-c++ \
-                make \
-                ninja-build \
-                qt6-qtbase-devel \
-                qt6-qtdeclarative-devel \
-                qt6-qtvirtualkeyboard-devel \
-                qt6-qtwebengine-devel \
-                rpm-build
           - artifact_label: fedora44
+            arch_label: x86_64
+            distro: fedora
+            runs_on: ubuntu-24.04
             container_image: fedora:44
             package_generator: RPM
             package_extension: rpm
             package_architecture_arg: ""
-            install_dependencies: |
-              dnf -y install \
-                bash \
-                cmake \
-                findutils \
-                gcc-c++ \
-                make \
-                ninja-build \
-                qt6-qtbase-devel \
-                qt6-qtdeclarative-devel \
-                qt6-qtvirtualkeyboard-devel \
-                qt6-qtwebengine-devel \
-                rpm-build
     container:
       image: ${{ matrix.container_image }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Install build dependencies
+      - name: Install build dependencies (Debian)
+        if: matrix.distro == 'debian'
         run: |
-          ${{ matrix.install_dependencies }}
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            bash \
+            build-essential \
+            ca-certificates \
+            cmake \
+            dpkg-dev \
+            fakeroot \
+            file \
+            ninja-build \
+            pkg-config \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            qt6-virtualkeyboard-dev \
+            qt6-webengine-dev
+
+      - name: Install build dependencies (Fedora)
+        if: matrix.distro == 'fedora'
+        run: |
+          dnf -y install \
+            bash \
+            cmake \
+            findutils \
+            gcc-c++ \
+            make \
+            ninja-build \
+            qt6-qtbase-devel \
+            qt6-qtdeclarative-devel \
+            qt6-qtvirtualkeyboard-devel \
+            qt6-qtwebengine-devel \
+            rpm-build
 
       - name: Build and package
         shell: bash
@@ -132,18 +117,18 @@ jobs:
             printf '%s\n' "${MATCHED_BINARIES[@]}"
             exit 1
           fi
-          cp "${MATCHED_BINARIES[0]}" "build/kiosk-browser-${{ matrix.artifact_label }}-arm64"
+          cp "${MATCHED_BINARIES[0]}" "build/kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}"
 
       - name: Upload raw binary
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: kiosk-browser-${{ matrix.artifact_label }}-arm64-binary
-          path: build/kiosk-browser-${{ matrix.artifact_label }}-arm64
+          name: kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}-binary
+          path: build/kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}
 
       - name: Upload package artifact
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: kiosk-browser-${{ matrix.artifact_label }}-arm64-${{ matrix.package_extension }}
+          name: kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}-${{ matrix.package_extension }}
           path: build/packages/*.${{ matrix.package_extension }}
