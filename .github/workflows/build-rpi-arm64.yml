@@ -77,7 +77,7 @@ jobs:
       - name: Install build dependencies (Fedora)
         if: matrix.distro == 'fedora'
         run: |
-          # Match Debian's explicit metadata refresh and no-recommends behavior.
+          # Use inline metadata refresh and disable weak deps (equivalent to apt update + --no-install-recommends).
           # rpm-build mirrors Debian's packaging tools; findutils provides GNU find in minimal Fedora images.
           dnf -y --refresh --setopt=install_weak_deps=False install \
             bash \
