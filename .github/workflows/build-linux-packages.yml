@@ -1,4 +1,4 @@
-name: Build Raspberry Pi OS arm64 binaries
+name: Build Linux binaries and packages
 
 on:
   pull_request:
@@ -123,14 +123,14 @@ jobs:
 
       - name: Upload raw binary
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}-binary
           path: build/kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}
 
       - name: Upload package artifact
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}-${{ matrix.package_extension }}
           path: build/packages/*.${{ matrix.package_extension }}
