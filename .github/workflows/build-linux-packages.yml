@@ -57,18 +57,15 @@ jobs:
         if: matrix.distro == 'debian'
         run: |
           apt-get update
-          # Keep ordering aligned with Fedora where package names map cleanly.
-          # dpkg-dev/fakeroot are Debian-specific packaging tools.
+          # dpkg-dev: dpkg-shlibdeps finds the library dependencies of the package.
+          # file: CPack needs it for those.
           apt-get install -y --no-install-recommends \
-            bash \
             ca-certificates \
             cmake \
-            ninja-build \
-            file \
-            pkg-config \
-            build-essential \
             dpkg-dev \
-            fakeroot \
+            file \
+            g++ \
+            ninja-build \
             qt6-base-dev \
             qt6-declarative-dev \
             qt6-virtualkeyboard-dev \
@@ -77,23 +74,15 @@ jobs:
       - name: Install build dependencies (Fedora)
         if: matrix.distro == 'fedora'
         run: |
-          # Use inline metadata refresh and disable weak deps (equivalent to apt update + --no-install-recommends).
-          # rpm-build mirrors Debian's packaging tools; findutils provides GNU find in minimal Fedora images.
           dnf -y --refresh --setopt=install_weak_deps=False install \
-            bash \
-            ca-certificates \
             cmake \
-            ninja-build \
-            file \
-            pkgconf-pkg-config \
             gcc-c++ \
-            make \
-            rpm-build \
-            findutils \
+            ninja-build \
             qt6-qtbase-devel \
             qt6-qtdeclarative-devel \
             qt6-qtvirtualkeyboard-devel \
-            qt6-qtwebengine-devel
+            qt6-qtwebengine-devel \
+            rpm-build
 
       - name: Build and package
         shell: bash
@@ -103,17 +92,21 @@ jobs:
             VERSION="0.1.${GITHUB_RUN_NUMBER}"
           fi
 
+          # CPACK_PACKAGE_FILE_NAME gives fixed file names, so that
+          # https://github.com/<repo>/releases/latest/download/<name> always resolves
+          # and the packages of different distributions do not collide
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DCPACK_GENERATOR=${{ matrix.package_generator }} \
-            -DCPACK_PACKAGE_VERSION="${VERSION}"
+            -DCPACK_PACKAGE_VERSION="${VERSION}" \
+            -DCPACK_PACKAGE_FILE_NAME="kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}"
 
           cmake --build build --parallel
           DESTDIR="${PWD}/stage" cmake --install build
           cpack --config build/CPackConfig.cmake -G ${{ matrix.package_generator }} -B build/packages
 
-          mapfile -t MATCHED_BINARIES < <(find stage/usr/bin -maxdepth 1 -type f -name '*kiosk-browser*' -executable)
+          readarray -t MATCHED_BINARIES < <(find stage/usr/bin -maxdepth 1 -type f -name '*kiosk-browser*' -executable)
           if [ "${#MATCHED_BINARIES[@]}" -ne 1 ]; then
             printf '%s\n' "Error: expected exactly one kiosk-browser executable in stage/usr/bin, found ${#MATCHED_BINARIES[@]}"
             printf '%s\n' "${MATCHED_BINARIES[@]}"
@@ -134,3 +127,25 @@ jobs:
         with:
           name: kiosk-browser-${{ matrix.artifact_label }}-${{ matrix.arch_label }}-${{ matrix.package_extension }}
           path: build/packages/*.${{ matrix.package_extension }}
+
+  # The build jobs run in distribution containers without the GitHub CLI,
+  # so attach the packages from a separate job.
+  release:
+    name: Attach packages to the release
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v5
+        with:
+          path: packages
+          merge-multiple: true
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            packages/*.deb packages/*.rpm \
+            --repo "${{ github.repository }}" --clobber
