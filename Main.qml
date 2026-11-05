@@ -2,17 +2,43 @@ import QtQuick
 import QtWebEngine
 import QtQuick.VirtualKeyboard
 
+// The context properties kioskUrl and kioskFullscreen
+// are provided by main.cpp.
 Window {
     id: window
     visible: true
-    visibility: "FullScreen"
+    visibility: kioskFullscreen ? Window.FullScreen : Window.Windowed
 
     WebEngineView {
         id: webView
-        anchors.fill: parent
-        url: "https://www.wikipedia.org"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        // Make room for the keyboard
+        // so that the browser scrolls the focused input into view.
+        height: inputPanel.active ? window.height - inputPanel.height : window.height
+        url: kioskUrl
 
         settings.playbackRequiresUserGesture: false
+        settings.focusOnNavigationEnabled: false
+
+        // Resizing alone does not scroll the focused input above the keyboard.
+        onHeightChanged: {
+            if (inputPanel.active) {
+                webView.runJavaScript(
+                    "document.activeElement && document.activeElement.scrollIntoView({block: 'center'})")
+            }
+        }
+
+        // No browser context menu in a kiosk.
+        onContextMenuRequested: function(request) {
+            request.accepted = true
+        }
+
+        // Keep everything in this view, no additional windows.
+        onNewWindowRequested: function(request) {
+            request.openIn(webView)
+        }
 
         onRenderProcessTerminated: function(terminationStatus, exitCode) {
             var status = "";
@@ -32,7 +58,7 @@ Window {
             }
 
             console.error(`Console: Render process exited with code ${exitCode} (${status})`);
-            reload();
+            reload()
         }
     }
 
